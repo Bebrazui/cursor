@@ -5,11 +5,12 @@ function vectorize(text) {
 }
 
 function getPageElements() {
-  // ... (старый код для getPageElements)
   const clickableElements = document.querySelectorAll('a, button, [role="button"]');
   const inputElements = document.querySelectorAll('input[type="text"], input[type="password"], input[type="email"], textarea');
+  
   let elements = [];
   let elementIndex = 0;
+
   clickableElements.forEach(element => {
     const text = (element.innerText || element.ariaLabel || '').trim();
     if (text) {
@@ -18,6 +19,7 @@ function getPageElements() {
       elements.push({ id: elementId, text: text, vector: vectorize(text), tag: element.tagName, type: 'clickable' });
     }
   });
+
   inputElements.forEach(element => {
     const label = element.labels && element.labels.length > 0 ? element.labels[0].innerText : '';
     const text = (label || element.placeholder || element.ariaLabel || '').trim();
@@ -27,6 +29,7 @@ function getPageElements() {
       elements.push({ id: elementId, text: text, vector: vectorize(text), tag: element.tagName, type: 'input' });
     }
   });
+
   return elements;
 }
 
