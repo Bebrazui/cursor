@@ -48,10 +48,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (command === 'обнови') {
         location.reload();
         sendResponse({ status: 'success', message: 'Страница обновлена.' });
+    } else if (command.startsWith('открой')) {
+        if (command.includes('новую вкладку')) {
+            chrome.runtime.sendMessage({ action: 'open_new_tab' });
+            sendResponse({ status: 'success', message: 'Открываю новую вкладку.' });
+        } else {
+            const url = command.replace('открой', '').trim();
+            chrome.runtime.sendMessage({ action: 'open_new_tab', url: `http://${url}` });
+            sendResponse({ status: 'success', message: `Открываю ${url}.` });
+        }
+    } else if (command.startsWith('найди')) {
+        const searchText = command.replace('найди', '').trim();
+        const found = window.find(searchText);
+        if (found) {
+            sendResponse({ status: 'success', message: `Нашел '${searchText}'.` });
+        } else {
+            sendResponse({ status: 'error', message: `Не нашел '${searchText}'.` });
+        }
+    } else if (command === 'краткая выжимка') {
+        const text = document.body.innerText;
+        sendResponse({ status: 'success', message: text.substring(0, 500) + '...' });
     } else {
       sendResponse({ status: 'error', message: 'Неизвестная команда.' });
     }
-    return true; // Keep the message channel open for async response
+    return true;
   }
 });
 
