@@ -18,7 +18,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const parts = command.match(/введи\s+['"]([^'"]+)['"](?:\s+в\s+['"]([^'"]+)['"])?/);
         if(parts) {
             const value = parts[1];
-            const fieldName = parts[2];
+            const fieldName = parts[2] || ''; // handle case where fieldName is not provided
             let inputElement = findBestMatch(fieldName, elements, ['input']);
             
             if(inputElement) {
@@ -35,34 +35,57 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+function vectorize(text) {
+  return text.toLowerCase().split(/\s+/).filter(word => word.length > 0);
+}
+
+function cosineSimilarity(vec1, vec2) {
+  const intersection = new Set(vec1.filter(word => vec2.includes(word)));
+  const dotProduct = intersection.size;
+
+  const magnitude1 = Math.sqrt(vec1.length);
+  const magnitude2 = Math.sqrt(vec2.length);
+
+  if (magnitude1 === 0 || magnitude2 === 0) {
+    return 0;
+  }
+
+  return dotProduct / (magnitude1 * magnitude2);
+}
+
 function findBestMatch(searchText, elements, types) {
     let bestMatch = null;
     let highestScore = -1;
+    const searchVector = vectorize(searchText);
 
     elements.forEach(element => {
         const isClickable = element.matches('a, button, [role="button"]');
         const isInput = element.matches('input, textarea');
 
-        letelementType = isClickable ? 'clickable' : (isInput ? 'input' : 'other');
+        let elementType = isClickable ? 'clickable' : (isInput ? 'input' : 'other');
         
         if (!types.includes(elementType)) return;
 
-        let score = 0;
         let text = '';
-
         if (isClickable) {
             text = (element.innerText || element.ariaLabel || '').toLowerCase();
         } else if (isInput) {
             text = (element.placeholder || element.ariaLabel || (element.labels && element.labels[0] && element.labels[0].innerText) || '').toLowerCase();
         }
 
-        if (text.includes(searchText)) {
-            score = searchText.length / text.length;
+        if(searchText === '' && types.includes('input')) { // If no specific input field is mentioned
+          bestMatch = element;
+          return;
         }
+        
+        if (text) {
+            const elementVector = vectorize(text);
+            const score = cosineSimilarity(searchVector, elementVector);
 
-        if (score > highestScore) {
-            highestScore = score;
-            bestMatch = element;
+            if (score > highestScore) {
+                highestScore = score;
+                bestMatch = element;
+            }
         }
     });
 
