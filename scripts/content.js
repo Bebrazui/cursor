@@ -3,11 +3,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const command = request.command.toLowerCase();
     const elements = Array.from(document.querySelectorAll('a, button, input, [role="button"], textarea'));
 
-    let targetElement = null;
-
     if (command.startsWith('нажми на')) {
       const searchText = command.replace('нажми на', '').trim().replace(/['"]/g, '');
-      targetElement = findBestMatch(searchText, elements, ['clickable']);
+      const targetElement = findBestMatch(searchText, elements, ['clickable']);
       if (targetElement) {
         targetElement.click();
         sendResponse({ status: 'success', message: `Нажал на ${targetElement.innerText}` });
@@ -18,9 +16,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const parts = command.match(/введи\s+['"]([^'"]+)['"](?:\s+в\s+['"]([^'"]+)['"])?/);
         if(parts) {
             const value = parts[1];
-            const fieldName = parts[2] || ''; // handle case where fieldName is not provided
-            let inputElement = findBestMatch(fieldName, elements, ['input']);
-            
+            const fieldName = parts[2] || '';
+            const inputElement = findBestMatch(fieldName, elements, ['input']);
             if(inputElement) {
                 inputElement.value = value;
                 sendResponse({ status: 'success', message: `Ввел '${value}' в поле.` });
@@ -28,6 +25,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 sendResponse({ status: 'error', message: 'Не нашел, куда вводить.' });
             }
         }
+    } else if (command.startsWith('прокрути')) {
+        if (command.includes('вниз')) {
+            window.scrollBy(0, window.innerHeight);
+            sendResponse({ status: 'success', message: 'Прокрутил вниз.' });
+        } else if (command.includes('вверх')) {
+            window.scrollBy(0, -window.innerHeight);
+            sendResponse({ status: 'success', message: 'Прокрутил вверх.' });
+        } else if (command.includes('самый низ')) {
+            window.scrollTo(0, document.body.scrollHeight);
+            sendResponse({ status: 'success', message: 'Прокрутил в самый низ.' });
+        } else if (command.includes('самый верх')) {
+            window.scrollTo(0, 0);
+            sendResponse({ status: 'success', message: 'Прокрутил в самый верх.' });
+        }
+    } else if (command === 'назад') {
+        history.back();
+        sendResponse({ status: 'success', message: 'Перешел назад.' });
+    } else if (command === 'вперед') {
+        history.forward();
+        sendResponse({ status: 'success', message: 'Перешел вперед.' });
+    } else if (command === 'обнови') {
+        location.reload();
+        sendResponse({ status: 'success', message: 'Страница обновлена.' });
     } else {
       sendResponse({ status: 'error', message: 'Неизвестная команда.' });
     }
@@ -73,8 +93,8 @@ function findBestMatch(searchText, elements, types) {
             text = (element.placeholder || element.ariaLabel || (element.labels && element.labels[0] && element.labels[0].innerText) || '').toLowerCase();
         }
 
-        if(searchText === '' && types.includes('input')) { // If no specific input field is mentioned
-          bestMatch = element;
+        if(searchText === '' && types.includes('input')) {
+          if (!bestMatch) bestMatch = element;
           return;
         }
         
