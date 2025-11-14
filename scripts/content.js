@@ -1,56 +1,70 @@
-console.log("Content script loaded.");
-
-function vectorize(text) {
-  return text.toLowerCase().split(/\s+/).filter(word => word.length > 0);
-}
-
-function getPageElements() {
-  const clickableElements = document.querySelectorAll('a, button, [role="button"]');
-  const inputElements = document.querySelectorAll('input[type="text"], input[type="password"], input[type="email"], textarea');
-  
-  let elements = [];
-  let elementIndex = 0;
-
-  clickableElements.forEach(element => {
-    const text = (element.innerText || element.ariaLabel || '').trim();
-    if (text) {
-      const elementId = `agent-element-${elementIndex++}`;
-      element.setAttribute('data-agent-id', elementId);
-      elements.push({ id: elementId, text: text, vector: vectorize(text), tag: element.tagName, type: 'clickable' });
-    }
-  });
-
-  inputElements.forEach(element => {
-    const label = element.labels && element.labels.length > 0 ? element.labels[0].innerText : '';
-    const text = (label || element.placeholder || element.ariaLabel || '').trim();
-    if (text) {
-      const elementId = `agent-element-${elementIndex++}`;
-      element.setAttribute('data-agent-id', elementId);
-      elements.push({ id: elementId, text: text, vector: vectorize(text), tag: element.tagName, type: 'input' });
-    }
-  });
-
-  return elements;
-}
-
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "get_elements") {
-    sendResponse({ elements: getPageElements() });
-  } else if (request.action === "click_element") {
-    const elementToClick = document.querySelector(`[data-agent-id='${request.elementId}']`);
-    if (elementToClick) {
-      elementToClick.click();
-      sendResponse({ status: "Element clicked" });
+  if (request.action === "execute_command") {
+    const command = request.command.toLowerCase();
+    const elements = Array.from(document.querySelectorAll('a, button, input, [role="button"], textarea'));
+
+    let targetElement = null;
+
+    if (command.startsWith('нажми на')) {
+      const searchText = command.replace('нажми на', '').trim().replace(/['"]/g, '');
+      targetElement = findBestMatch(searchText, elements, ['clickable']);
+      if (targetElement) {
+        targetElement.click();
+        sendResponse({ status: 'success', message: `Нажал на ${targetElement.innerText}` });
+      } else {
+        sendResponse({ status: 'error', message: 'Не нашел, что нажать.' });
+      }
+    } else if (command.startsWith('введи')) {
+        const parts = command.match(/введи\s+['"]([^'"]+)['"](?:\s+в\s+['"]([^'"]+)['"])?/);
+        if(parts) {
+            const value = parts[1];
+            const fieldName = parts[2];
+            let inputElement = findBestMatch(fieldName, elements, ['input']);
+            
+            if(inputElement) {
+                inputElement.value = value;
+                sendResponse({ status: 'success', message: `Ввел '${value}' в поле.` });
+            } else {
+                sendResponse({ status: 'error', message: 'Не нашел, куда вводить.' });
+            }
+        }
     } else {
-      sendResponse({ status: "Element not found" });
+      sendResponse({ status: 'error', message: 'Неизвестная команда.' });
     }
-  } else if (request.action === "type_in_element") {
-    const elementToTypeIn = document.querySelector(`[data-agent-id='${request.elementId}']`);
-    if (elementToTypeIn) {
-      elementToTypeIn.value = request.value;
-      sendResponse({ status: "Text typed in element" });
-    } else {
-      sendResponse({ status: "Element not found" });
-    }
+    return true; // Keep the message channel open for async response
   }
 });
+
+function findBestMatch(searchText, elements, types) {
+    let bestMatch = null;
+    let highestScore = -1;
+
+    elements.forEach(element => {
+        const isClickable = element.matches('a, button, [role="button"]');
+        const isInput = element.matches('input, textarea');
+
+        letelementType = isClickable ? 'clickable' : (isInput ? 'input' : 'other');
+        
+        if (!types.includes(elementType)) return;
+
+        let score = 0;
+        let text = '';
+
+        if (isClickable) {
+            text = (element.innerText || element.ariaLabel || '').toLowerCase();
+        } else if (isInput) {
+            text = (element.placeholder || element.ariaLabel || (element.labels && element.labels[0] && element.labels[0].innerText) || '').toLowerCase();
+        }
+
+        if (text.includes(searchText)) {
+            score = searchText.length / text.length;
+        }
+
+        if (score > highestScore) {
+            highestScore = score;
+            bestMatch = element;
+        }
+    });
+
+    return bestMatch;
+}
